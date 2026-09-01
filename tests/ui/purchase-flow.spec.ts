@@ -22,6 +22,13 @@ for (const productName of PRODUCTS_TO_PURCHASE) {
         return detailPage;
       });
 
+      // Carry the name as rendered on the detail page into the cart assertion, so the cart is
+      // checked against the product that was actually added rather than against the test's own
+      // input constant - the assignment asks for "exactly the product you added". `isLoadedFor`
+      // above has already pinned that heading to `productName`, so this makes the data flow
+      // explicit; it does not widen coverage.
+      const addedProductName = await productDetailPage.getProductName();
+
       await test.step('Add the product to the cart, accepting the confirmation dialog', async () => {
         await productDetailPage.addToCart();
       });
@@ -34,7 +41,7 @@ for (const productName of PRODUCTS_TO_PURCHASE) {
       });
 
       await test.step('Verify the cart contains exactly the purchased product', async () => {
-        await cartPage.expectOnlyItem(productName);
+        await cartPage.expectOnlyItem(addedProductName);
       });
     });
   });

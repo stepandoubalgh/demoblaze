@@ -1,5 +1,5 @@
 import type { APIRequestContext, APIResponse } from '@playwright/test';
-import type { BookingData, CreateBookingResponse, GetBookingResponse } from '../models/booking.model';
+import type { BookingData } from '../models/booking.model';
 
 /**
  * Thin, typed wrapper around Playwright's `APIRequestContext` for the
@@ -34,17 +34,5 @@ export class BookingApiClient {
     return this.request.get(`/booking/${bookingId}`, {
       headers: { Accept: 'application/json' },
     });
-  }
-
-  /** Convenience helper: creates a booking and returns the parsed JSON body. */
-  async createBookingJson(bookingData: BookingData): Promise<CreateBookingResponse> {
-    const response = await this.createBooking(bookingData);
-    return response.json();
-  }
-
-  /** Convenience helper: fetches a booking and returns the parsed JSON body. */
-  async getBookingJson(bookingId: number): Promise<GetBookingResponse> {
-    const response = await this.getBooking(bookingId);
-    return response.json();
   }
 }

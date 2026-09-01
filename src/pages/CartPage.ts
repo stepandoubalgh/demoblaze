@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { BasePage } from './BasePage';
 import { NavigationHeader } from '../components/NavigationHeader';
 
@@ -8,9 +8,13 @@ import { NavigationHeader } from '../components/NavigationHeader';
 export class CartPage extends BasePage {
   readonly navigationHeader: NavigationHeader;
 
+  /** Product-name cell of every row currently in the cart table. */
+  private readonly itemNameCells: Locator;
+
   constructor(page: Page) {
     super(page);
     this.navigationHeader = new NavigationHeader(page);
+    this.itemNameCells = page.locator('#tbodyid tr td:nth-child(2)');
   }
 
   /** @inheritdoc */
@@ -19,24 +23,18 @@ export class CartPage extends BasePage {
   }
 
   /**
-   * Reads the product names currently listed in the cart table body.
-   * Waits for at least one row to exist so callers never race the
-   * async cart-loading request the page fires on mount.
-   */
-  async getCartItemNames(): Promise<string[]> {
-    const rows = this.page.locator('#tbodyid tr');
-    await expect(rows.first()).toBeVisible();
-    return rows.locator('td:nth-child(2)').allTextContents();
-  }
-
-  /**
-   * Asserts the cart contains exactly one row, and that it is the
-   * given product.
+   * Asserts the cart contains exactly one row, and that it is the given
+   * product.
+   *
+   * Uses Playwright's auto-retrying array assertion, which polls until
+   * both the row count and every cell's text match. The cart table is
+   * rendered from an async request the page fires on mount, so a
+   * one-shot snapshot of the rows could observe a partially rendered
+   * table; this cannot.
    *
    * @param productName expected product name in the single cart row
    */
   async expectOnlyItem(productName: string): Promise<void> {
-    const itemNames = await this.getCartItemNames();
-    expect(itemNames).toEqual([productName]);
+    await expect(this.itemNameCells).toHaveText([productName]);
   }
 }
