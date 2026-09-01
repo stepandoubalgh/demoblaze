@@ -1,0 +1,72 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ui-tests:
+    name: UI tests (Demoblaze)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run UI tests (headless Chromium)
+        run: npm run test:ui
+
+      - name: Upload UI test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-ui
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload UI test results (traces, screenshots, video)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-ui
+          path: test-results/
+          retention-days: 30
+
+  api-tests:
+    name: API tests (Restful-Booker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run API tests
+        run: npm run test:api
+
+      - name: Upload API test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-api
+          path: playwright-report/
+          retention-days: 30
