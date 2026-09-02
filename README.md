@@ -164,6 +164,16 @@ Schema assumed:
 - `bookings(id, customer_id, total_price, deposit_paid)`
 - `users(id, ...)` / `addresses(user_id, ...)` for the address-verification query
 
+The test account's email identifies the row in every query below, so it is set once as a psql
+variable rather than repeated as a literal - the value changes per test run, the queries do not:
+
+```sql
+\set test_email 'milena.stranska@example.com'
+```
+
+Run from test code rather than from `psql`, the same queries take it as a bound parameter (`$1`),
+which is both the same idea and the reason no test data ever gets concatenated into SQL.
+
 ### Cleanup: delete a test customer and their bookings
 
 Child rows (`bookings`) are deleted before the parent (`customers`) row to respect the
@@ -172,11 +182,11 @@ Child rows (`bookings`) are deleted before the parent (`customers`) row to respe
 ```sql
 DELETE FROM bookings
 WHERE customer_id = (
-  SELECT id FROM customers WHERE email = 'milena.stranska@example.com'
+  SELECT id FROM customers WHERE email = :'test_email'
 );
 
 DELETE FROM customers
-WHERE email = 'milena.stranska@example.com';
+WHERE email = :'test_email';
 ```
 
 (Equivalently, if the `bookings.customer_id` foreign key is defined with `ON DELETE CASCADE`, the
@@ -188,5 +198,5 @@ single `DELETE FROM customers ...` statement is enough.)
 SELECT u.id, u.firstname, u.lastname, a.street, a.city, a.postal_code, a.country
 FROM users u
 JOIN addresses a ON a.user_id = u.id
-WHERE u.email = 'milena.stranska@example.com';
+WHERE u.email = :'test_email';
 ```
