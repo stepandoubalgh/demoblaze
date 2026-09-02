@@ -11,15 +11,33 @@ export class CartPage extends BasePage {
   /** Product-name cell of every row currently in the cart table. */
   private readonly itemNameCells: Locator;
 
+  /** Static page heading, served with cart.html regardless of cart contents. */
+  private readonly heading: Locator;
+
   constructor(page: Page) {
     super(page);
     this.navigationHeader = new NavigationHeader(page);
     this.itemNameCells = page.locator('#tbodyid tr td:nth-child(2)');
+    this.heading = page.getByRole('heading', { name: 'Products', exact: true });
   }
 
-  /** @inheritdoc */
+  /**
+   * @inheritdoc
+   *
+   * Anchors on the static "Products" heading rather than on the `#tbodyid`
+   * table body. Two reasons, and they point the same way:
+   *
+   * 1. An empty cart is a legitimate state of this page, so a guard that only
+   *    passes once rows exist would be asserting the wrong thing.
+   * 2. `#tbodyid` is an empty `<tbody>` until the rows arrive, and an empty
+   *    element has no box — Playwright reports it as hidden, so the guard
+   *    could never pass on an empty cart at all.
+   *
+   * Waiting for the rows themselves belongs to
+   * {@link CartPage.expectOnlyItem}, which is what actually cares about them.
+   */
   async isLoaded(): Promise<void> {
-    await this.assertLoaded(/cart\.html/, this.page.locator('#tbodyid'));
+    await this.assertLoaded(/cart\.html/, this.heading);
   }
 
   /**
