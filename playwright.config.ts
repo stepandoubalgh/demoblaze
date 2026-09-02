@@ -10,8 +10,10 @@ export default defineConfig({
   testDir: './tests',
 
   /**
-   * Demoblaze responds deliberately slowly, and these budgets come from a
-   * Playwright trace of a real run rather than from guesswork:
+   * Demoblaze's response time varies by more than an order of magnitude, so
+   * these budgets are sized for the slow end rather than the typical one.
+   *
+   * A Playwright trace of one run measured:
    *
    *   GET  /entries    (product grid)     17.0 s
    *   POST /view       (product page)     33.9 s
@@ -19,18 +21,22 @@ export default defineConfig({
    *   POST /viewcart                      33.2 s
    *   POST /view       (cart row)        ~34   s
    *
-   * Two consequences drive the numbers below. First, the cart renders through
+   * That is ~155 s of pure waiting for one scenario, or 2.7 min per test. The
+   * same suite on the same machine later ran at 13 s per test, and takes ~6 s
+   * on a GitHub runner. The spread is the constraint, not any single number.
+   *
+   * Two consequences drive the values below. First, the cart renders through
    * a *chain* of two requests — `viewcart`, and only then a `view` per item —
    * so a single assertion there has to survive roughly 70 s. That is why the
    * expect timeout is what it is; at 60 s the cart assertion failed with the
-   * second request still in flight. Second, one purchase scenario adds up to
-   * around 155 s of pure waiting, so the per-test ceiling has to clear that
-   * with room to spare.
+   * second request still in flight. Second, the per-test ceiling has to clear
+   * that ~155 s worst case with room to spare.
    *
-   * Raising these does not slow the suite down in the good case: every wait in
-   * this project is an auto-retrying Playwright assertion that resolves the
-   * moment the data arrives. A timeout is a ceiling, never a delay — there is
-   * not a single static sleep in the codebase.
+   * Sizing for the bad case costs nothing in the good one: every wait in this
+   * project is an auto-retrying Playwright assertion that resolves the moment
+   * the data arrives, which is why the same config still finishes in seconds
+   * when the site is responsive. A timeout is a ceiling, never a delay — there
+   * is not a single static sleep in the codebase.
    */
   timeout: 300_000,
   expect: { timeout: 120_000 },

@@ -130,16 +130,21 @@ no URL/`isLoaded` contract of its own and is composed into `HomePage`, `ProductD
   cell's text match. The cart table renders from an async request the page fires on mount, so a
   one-shot snapshot of the rows could observe a partially rendered table; this cannot.
 
-**Timeouts derived from measurement, not habit.** Demoblaze is deliberately slow, and the budgets
-in `playwright.config.ts` come from a Playwright trace of a real run: 17.0 s for the product grid
-(`GET /entries`), 33.9 s for a product page (`POST /view`), 35.8 s for `POST /addtocart`, 33.2 s
-for `POST /viewcart`. Two consequences follow. The cart renders through a _chain_ of two requests,
-so a single assertion there has to survive roughly 70 s - at a 60 s expect timeout it failed with
-the second request still in flight. And one purchase scenario adds up to about 155 s of pure
-waiting, so the per-test ceiling has to clear that with room to spare. Hence `timeout: 300_000` and
+**Timeouts sized for the worst observed case, not the typical one.** Demoblaze's response time
+varies by more than an order of magnitude, which is the actual design constraint here. A Playwright
+trace of one run showed 17.0 s for the product grid (`GET /entries`), 33.9 s for a product page
+(`POST /view`), 35.8 s for `POST /addtocart` and 33.2 s for `POST /viewcart` - about 155 s of pure
+waiting for one purchase scenario, or 2.7 min per test. The same suite on the same machine later
+took 13 s per test, and 6 s on a GitHub runner.
+
+Budgets are therefore set from the slow end. The cart renders through a _chain_ of two requests, so
+a single assertion there has to survive roughly 70 s - at a 60 s expect timeout it failed with the
+second request still in flight. Hence `timeout: 300_000` and
 `expect: { timeout: 120_000 }`, with the measurements recorded next to them in the config. Raising
 these does not slow the suite down in the good case: a timeout is a ceiling, never a delay - every
-wait in this project is an auto-retrying assertion that resolves the moment the data arrives.
+wait in this project is an auto-retrying assertion that resolves the moment the data arrives. The
+fast runs above are that claim's evidence - same configuration, same assertions, seconds instead of
+minutes.
 
 **Typed API layer.** `BookingApiClient` wraps Playwright's built-in `APIRequestContext`
 (`request` fixture) and returns typed results via the `BookingData` / `CreateBookingResponse` /
