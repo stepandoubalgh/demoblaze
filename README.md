@@ -47,9 +47,20 @@ npm run test:ui
 # run only the API suite
 npm run test:api
 
+# run the UI suite in a visible, maximized window (walkthroughs, debugging)
+npm run test:demo
+
 # open the last HTML report
 npm run report
 ```
+
+### Test projects
+
+`playwright.config.ts` defines three projects. `ui` and `api` are what `npm test` and CI run;
+`ui-demo` is the same UI suite in a headed, maximized window and is deliberately excluded from
+`npm test`. It exists as a separate project rather than a flag because the window size determines
+the viewport: `ui` must stay at a fixed 1280x720 so CI runs and failure screenshots are
+reproducible on any machine, while a walkthrough wants the whole screen.
 
 Useful during development:
 
@@ -74,7 +85,10 @@ npm run format          # Prettier write
 - **`ui-tests`** and **`api-tests`** run as two separate jobs (matching the `ui`/`api` Playwright
   projects defined in `playwright.config.ts`), so UI and API runs are isolated and can execute in
   parallel.
-- Both jobs run **headless Chromium**.
+- **`ui-tests`** runs headless Chromium. **`api-tests`** installs no browser at all: the API suite
+  talks to Restful-Booker through Playwright's `request` fixture, a standalone HTTP client, so the
+  browser download is dead weight there. Verified rather than assumed - running both suites with an
+  empty `PLAYWRIGHT_BROWSERS_PATH` fails the UI suite and passes the API one.
 - On failure, the HTML report (and, for UI, traces/screenshots/video from `test-results/`) is
   uploaded as a build artifact with a **30-day retention**.
 
@@ -82,9 +96,21 @@ npm run format          # Prettier write
 
 **Page Object Model with explicit page guards.** Every page extends `BasePage`, which exposes a
 shared `assertLoaded(urlPattern, anchorLocator)` helper. Each concrete page's `isLoaded()`
-verifies both the URL and a key element unique to that page (e.g. the `.name` heading on the
-product detail page, the `#tbodyid` cart table on the cart page). This gives every navigation
-step a reliable, reusable checkpoint instead of ad-hoc assertions scattered through the tests.
+verifies both the URL and a key element unique to that page. This gives every navigation step a
+reliable, reusable checkpoint instead of ad-hoc assertions scattered through the tests.
+
+Which element a guard anchors on matters more than it looks, and both non-obvious cases here were
+settled against the live site rather than by reading the DOM from memory:
+
+- `HomePage` anchors on a product card inside `#tbodyid`, which is fetched asynchronously - not on
+  static chrome such as the CATEGORIES sidebar, which ships in the served HTML and is therefore
+  present before any content has loaded. A guard on the sidebar passes on an empty page.
+- `CartPage` anchors on the static "Products" heading. An empty cart is a legitimate state of that
+  page, and an empty `<tbody>` has no box - Playwright reports it as hidden - so a guard on
+  `#tbodyid` could never pass on an empty cart. Waiting for the rows themselves belongs to
+  `expectOnlyItem()`, which is what actually cares about them.
+- `ProductDetailPage` anchors on the `.name` heading, and `isLoadedFor(name)` additionally asserts
+  that the heading matches the product the test asked for.
 
 **Shared component vs. page.** `NavigationHeader` is modeled as a component, not a page: it has
 no URL/`isLoaded` contract of its own and is composed into `HomePage`, `ProductDetailPage` and
@@ -99,8 +125,21 @@ no URL/`isLoaded` contract of its own and is composed into `HomePage`, `ProductD
   `page.waitForEvent('dialog')` **before** clicking the button, then `await`-ing the resulting
   promise. This is inherently asynchronous and race-free: the click and the dialog handshake are
   awaited together rather than assumed to happen within some guessed timeout.
-- Cart-content reads wait on the first row locator to become visible before reading all rows,
-  covering the async client-side render of the cart table.
+- The cart assertion uses Playwright's auto-retrying array form,
+  `expect(itemNameCells).toHaveText([productName])`, which polls until both the row count and every
+  cell's text match. The cart table renders from an async request the page fires on mount, so a
+  one-shot snapshot of the rows could observe a partially rendered table; this cannot.
+
+**Timeouts derived from measurement, not habit.** Demoblaze is deliberately slow, and the budgets
+in `playwright.config.ts` come from a Playwright trace of a real run: 17.0 s for the product grid
+(`GET /entries`), 33.9 s for a product page (`POST /view`), 35.8 s for `POST /addtocart`, 33.2 s
+for `POST /viewcart`. Two consequences follow. The cart renders through a _chain_ of two requests,
+so a single assertion there has to survive roughly 70 s - at a 60 s expect timeout it failed with
+the second request still in flight. And one purchase scenario adds up to about 155 s of pure
+waiting, so the per-test ceiling has to clear that with room to spare. Hence `timeout: 300_000` and
+`expect: { timeout: 120_000 }`, with the measurements recorded next to them in the config. Raising
+these does not slow the suite down in the good case: a timeout is a ceiling, never a delay - every
+wait in this project is an auto-retrying assertion that resolves the moment the data arrives.
 
 **Typed API layer.** `BookingApiClient` wraps Playwright's built-in `APIRequestContext`
 (`request` fixture) and returns typed results via the `BookingData` / `CreateBookingResponse` /
