@@ -1,5 +1,5 @@
 import { test, expect } from '../../src/fixtures/test-fixtures';
-import type { BookingData } from '../../src/models/booking.model';
+import type { BookingData, CreateBookingResponse, GetBookingResponse } from '../../src/models/booking.model';
 
 /** Sample booking payload used for the happy-path integration scenario. */
 const bookingData: BookingData = {
@@ -20,18 +20,18 @@ test.describe('Restful-Booker integration - happy path', () => {
       const response = await bookingApiClient.createBooking(bookingData);
       expect(response.status()).toBe(200);
 
-      const body = await response.json();
+      const body: CreateBookingResponse = await response.json();
       expect(body.bookingid).toEqual(expect.any(Number));
       expect(body.booking).toEqual(bookingData);
 
-      return body.bookingid as number;
+      return body.bookingid;
     });
 
     await test.step('Read the booking back (GET /booking/{id}) and verify it matches', async () => {
       const response = await bookingApiClient.getBooking(bookingId);
       expect(response.status()).toBe(200);
 
-      const body = await response.json();
+      const body: GetBookingResponse = await response.json();
       expect(body).toEqual(bookingData);
     });
   });

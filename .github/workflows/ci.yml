@@ -57,9 +57,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
+      # No `playwright install` here on purpose: the API suite talks to Restful-Booker through
+      # Playwright's `request` fixture (a standalone HTTP client), so it never launches a
+      # browser. Skipping the download keeps this job fast.
       - name: Run API tests
         run: npm run test:api
 
